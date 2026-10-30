@@ -4,15 +4,37 @@ Dieses "Framework" enthält eine grundlegende Struktur für die Umsetzung einer 
 
 ## 0. Requirements
 
-- Python >3.12
+- Python >=3.12
+- [uv](https://docs.astral.sh/uv/) (Paket- und Umgebungsmanager für Python)
 
 ## 1. Installation
 
-Wir empfehlen die Pakete in einem virtuellen environment zu installieren. Für Details, siehe die Einführung in Python. 
+Das Projekt nutzt **uv** zur Verwaltung der Python-Version, der virtuellen Umgebung und der Abhängigkeiten.
 
-1. Installieren aller python Pakete: `pip install "gymnasium[box2d]" numpy matplotlib scipy opencv-python`
-2. In den Source Ordner wechseln `cd <working-dir>`
-3. Testen der Installation: `python test_installation.py`. Danach sollte sich die Simulation öffnen und das Fahrzeug zufällig bewegen.
+### 1.1 uv installieren
+
+```bash
+pip install uv
+```
+
+Danach mit `uv --version` prüfen, ob uv verfügbar ist.
+
+### 1.2 Projekt einrichten
+
+1. In den Projektordner wechseln: `cd <working-dir>`
+2. Umgebung erstellen und alle Pakete installieren: `uv sync`
+   - Legt automatisch eine virtuelle Umgebung in `.venv/` an (und lädt bei Bedarf die passende Python-Version herunter).
+   - Installiert exakt die Versionen aus `uv.lock`, sodass alle Entwickler dieselbe Umgebung haben.
+3. Testen der Installation: `uv run python test_installation.py`. Danach sollte sich die Simulation öffnen und das Fahrzeug zufällig bewegen.
+
+### 1.3 Arbeiten mit uv
+
+- **Skripte ausführen:** `uv run python <datei>.py` (nutzt automatisch die `.venv`, kein manuelles Aktivieren nötig)
+- **Paket hinzufügen:** `uv add <paket>` (aktualisiert `pyproject.toml` und `uv.lock`)
+- **Paket entfernen:** `uv remove <paket>`
+- **Nach einem `git pull`:** `uv sync` ausführen, falls sich `pyproject.toml` oder `uv.lock` geändert haben
+
+> **Wichtig:** `pyproject.toml` und `uv.lock` werden immer mit committet, `uv.lock` wird nie von Hand bearbeitet. Der Ordner `.venv/` gehört **nicht** ins Repository.
 
 ## 2. Dateistruktur
 
@@ -40,7 +62,7 @@ working-dir/
 
 ## 3. Ausführung
 
-Die test Dateien können mit `python <test-file>.py` ausgeführt werden. Die Simulation wird sich öffnen und das Fahrzeug wird sich entsprechend der Pipeline bewegen. Um das Endergebnis zu simulieren, kann die `main.py` Datei ausgeführt werden. Sie führt die Pipeline über 5 Iterationen aus und berechnet den durchschnittlichen Score.
+Die test Dateien können mit `uv run python <test-file>.py` ausgeführt werden. Die Simulation wird sich öffnen und das Fahrzeug wird sich entsprechend der Pipeline bewegen. Um das Endergebnis zu simulieren, kann die `main.py` Datei ausgeführt werden. Sie führt die Pipeline über 5 Iterationen aus und berechnet den durchschnittlichen Score.
 
 ## 4. Hinweise
 
