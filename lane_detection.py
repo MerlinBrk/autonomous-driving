@@ -16,4 +16,11 @@ class LaneDetection:
         self.debug_image[car_mask] = [102, 102, 102]
         self.debug_image = self.debug_image[..., 1]
 
+        gx = ndimage.sobel(self.debug_image, axis=1)   # Änderung nach rechts  → senkrechte Kanten
+        gy = ndimage.sobel(self.debug_image, axis=0)   # Änderung nach unten   → waagrechte Kanten
+
+        magnitude = np.hypot(gx, gy)  
+        edges = magnitude > 200
+        e = edges.astype(np.uint8) * 255
+        self.debug_image = np.stack([e, e, e], axis=2)         # für die Anzeige auf 3 Kanäle            # Schwellwert ausprobieren
         return np.array([]), np.array([])
