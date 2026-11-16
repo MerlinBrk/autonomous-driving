@@ -29,6 +29,7 @@ class LateralControl:
         smoothing=0.3,         # Tiefpass auf Lenkwert: 0 = aus, ->1 = sehr träge
         max_steer=1.0,
         max_gap=15.0,          # [px] größerer Punktabstand = anderer Streckenteil
+        warmup_steps=20,       # Schritte am Start ohne Lenkung (Kamera zoomt noch, Bild unbrauchbar)
     ):
         if mode not in (self.STANLEY, self.PURE_PURSUIT):
             raise ValueError(f"Unbekannter Modus '{mode}', erlaubt: 'stanley', 'pure_pursuit'")
@@ -49,10 +50,20 @@ class LateralControl:
         self.max_steer = max_steer
         self.max_gap = max_gap
 
+        self.warmup_steps = warmup_steps
+
         self._prev_steer = 0.0
+        self._step = 0
 
     # ------------------------------------------------------------------ API
     def control(self, trajectory, speed):
+        # Startphase: Die Kamera zoomt in den ersten ~50 Schritten noch hinein, die Pixel-
+        # abstände stimmen nicht und die Spurerkennung liefert Unsinn. Das Auto steht am
+        # Start gerade auf der Strecke -> einfach geradeaus fahren, sonst schaukelt es sich auf.
+        self._step += 1
+        if self._step <= self.warmup_steps:
+            return 0.0
+
         path = self._prepare_path(trajectory)
         if path is None:
             # kein brauchbarer Pfad -> letzten Lenkwert langsam abbauen
@@ -73,6 +84,7 @@ class LateralControl:
 
     def reset(self):
         self._prev_steer = 0.0
+        self._step = 0
 
     # ------------------------------------------------------------ Stanley
     def _stanley(self, path, speed):
