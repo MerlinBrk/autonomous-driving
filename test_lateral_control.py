@@ -8,8 +8,9 @@ from input_controller import InputController
 from lateral_control import LateralControl
 
 
-def run(env, input_controller: InputController):
-    lateral_control = LateralControl()
+def run(env, input_controller: InputController, mode: str = "stanley"):
+    lateral_control = LateralControl(mode=mode)
+    print(f"Querregler: {mode}")
 
     seed = int(np.random.randint(0, int(1e6)))
     state_image, info = env.reset(seed=seed)
@@ -48,6 +49,9 @@ def run(env, input_controller: InputController):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--no_display", action="store_true", default=False)
+    parser.add_argument(
+        "--mode", choices=["stanley", "pure_pursuit"], default="stanley"
+    )
     args = parser.parse_args()
 
     render_mode = "rgb_array" if args.no_display else "human"
@@ -56,7 +60,7 @@ def main():
     )
     input_controller = InputController()
 
-    run(env, input_controller)
+    run(env, input_controller, args.mode)
     env.reset()
 
 
