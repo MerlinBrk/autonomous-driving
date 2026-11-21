@@ -48,11 +48,12 @@ def run(env, input_controller: InputController):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--no_display", action="store_true", default=False)
+    parser.add_argument("--domain_randomize", action="store_true", default=False)
     args = parser.parse_args()
 
     render_mode = "rgb_array" if args.no_display else "human"
     env = CarRacingEnvWrapper(
-        gym.make("CarRacing-v3", render_mode=render_mode, domain_randomize=False)
+        gym.make("CarRacing-v3", render_mode=render_mode, domain_randomize=args.domain_randomize)
     )
     input_controller = InputController()
 

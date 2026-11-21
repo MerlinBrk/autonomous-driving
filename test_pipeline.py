@@ -44,7 +44,7 @@ def run(env, input_controller: InputController):
 
         cv_image = np.asarray(lane_detection.debug_image, dtype=np.uint8)
         for point in trajectory:
-            if 0 < point[0] < 96 and 0 < point[1] < 84:
+            if 0 <= point[0] < cv_image.shape[1] and 0 <= point[1] < cv_image.shape[0]:
                 cv_image[int(point[1]), int(point[0])] = [255, 255, 255]
 
         cv_image = cv2.cvtColor(cv_image, cv2.COLOR_RGB2BGR)

@@ -1,9 +1,9 @@
-"""Vergleicht Stanley und Pure Pursuit automatisch (ohne Fenster).
+"""Compares Stanley and Pure Pursuit automatically (no window).
 
-Gas/Bremse übernimmt ein simpler Regler, der eine feste Zielgeschwindigkeit hält.
-Beide Verfahren fahren dieselben Strecken (Seeds), damit der Vergleich fair ist.
+Gas/brake is handled by a simple controller that holds a fixed target speed.
+Both methods drive the same tracks (seeds) so the comparison is fair.
 
-Aufruf:
+Usage:
     uv run python compare_lateral_control.py
     uv run python compare_lateral_control.py --speeds 40 60 --seeds 10
 """
@@ -35,7 +35,7 @@ def drive(env, mode, seed, target_speed, max_steps):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--speeds", type=float, nargs="+", default=[40, 60, 80])
-    parser.add_argument("--seeds", type=int, default=5, help="Anzahl Strecken")
+    parser.add_argument("--seeds", type=int, default=5, help="number of tracks")
     parser.add_argument("--max_steps", type=int, default=1000)
     args = parser.parse_args()
 
@@ -45,8 +45,8 @@ def main():
     seeds = list(range(args.seeds))
     modes = ["stanley", "pure_pursuit"]
 
-    print(f"Strecken (Seeds): {seeds}\n")
-    print(f"{'Tempo':>6} | {'stanley':>10} | {'pure_pursuit':>12}")
+    print(f"Tracks (seeds): {seeds}\n")
+    print(f"{'Speed':>6} | {'stanley':>10} | {'pure_pursuit':>12}")
     print("-" * 36)
     for speed in args.speeds:
         means = []

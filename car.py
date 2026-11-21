@@ -10,7 +10,7 @@ class Car:
     def __init__(self):
         self._lane_detection = LaneDetection()
         self._path_planning = PathPlanning()
-        self._lateral_control = LateralControl()
+        self._lateral_control = LateralControl(mode="pure_pursuit")
         self._longitudinal_control = LongitudinalControl()
 
     def next_action(self, observation: np.ndarray, info: dict[str, any]) -> list:

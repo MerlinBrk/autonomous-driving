@@ -10,7 +10,7 @@ from lateral_control import LateralControl
 
 def run(env, input_controller: InputController, mode: str = "stanley"):
     lateral_control = LateralControl(mode=mode)
-    print(f"Querregler: {mode}")
+    print(f"Lateral controller: {mode}")
 
     seed = int(np.random.randint(0, int(1e6)))
     state_image, info = env.reset(seed=seed)

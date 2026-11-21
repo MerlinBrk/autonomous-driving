@@ -2,12 +2,12 @@ import numpy as np
 
 
 class LateralControl:
-    """Querregelung mit umschaltbarem Regler: Stanley oder Pure Pursuit.
+    """Lateral control with switchable controller: Stanley or Pure Pursuit.
 
-    Koordinaten: Bildkoordinaten (x nach rechts, y nach unten), Einheit Pixel.
-    Fahrtrichtung des Autos = im Bild nach oben (-y).
-    Ausgabe: Lenkwert für CarRacing (+ = rechts). Der Wert entspricht etwa dem
-    Radlenkwinkel in rad, die Räder sind mechanisch auf +-0.4 rad begrenzt.
+    Coordinates: image coordinates (x to the right, y down), unit pixels.
+    Driving direction of the car = up in the image (-y).
+    Output: steering value for CarRacing (+ = right). The value roughly equals the
+    wheel steering angle in rad; the wheels are mechanically limited to +-0.4 rad.
     """
 
     STANLEY = "stanley"
@@ -17,22 +17,22 @@ class LateralControl:
         self,
         mode="stanley",
         # --- Stanley ---
-        k=3.0,                 # Verstärkung Querabweichung
-        k_soft=5.0,            # verhindert Überreaktion bei kleiner Geschwindigkeit
-        heading_window=6.0,    # [px] Strecke, über die die Pfadtangente gemittelt wird
+        k=3.0,                 # gain for the cross-track error
+        k_soft=5.0,            # prevents overreaction at low speed
+        heading_window=6.0,    # [px] distance over which the path tangent is averaged
         # --- Pure Pursuit ---
-        wheelbase=5.0,         # [px] Radstand (~3.2 Weltheinheiten * ~1.55 px)
-        ld_min=8.0,            # [px] minimale Lookahead-Distanz
-        ld_gain=0.15,          # [px pro Geschwindigkeitseinheit]
-        ld_max=30.0,           # [px] maximale Lookahead-Distanz
-        # --- allgemein ---
-        smoothing=0.3,         # Tiefpass auf Lenkwert: 0 = aus, ->1 = sehr träge
+        wheelbase=5.0,         # [px] wheelbase (~3.2 world units * ~1.55 px)
+        ld_min=8.0,            # [px] minimum lookahead distance
+        ld_gain=0.15,          # [px per speed unit]
+        ld_max=30.0,           # [px] maximum lookahead distance
+        # --- general ---
+        smoothing=0.3,         # low-pass on steering: 0 = off, ->1 = very sluggish
         max_steer=1.0,
-        max_gap=15.0,          # [px] größerer Punktabstand = anderer Streckenteil
-        warmup_steps=20,       # Schritte am Start ohne Lenkung (Kamera zoomt noch, Bild unbrauchbar)
+        max_gap=15.0,          # [px] larger point spacing = different part of the track
+        warmup_steps=50,       # steps at the start without steering (camera still zooming, image unusable)
     ):
         if mode not in (self.STANLEY, self.PURE_PURSUIT):
-            raise ValueError(f"Unbekannter Modus '{mode}', erlaubt: 'stanley', 'pure_pursuit'")
+            raise ValueError(f"Unknown mode '{mode}', allowed: 'stanley', 'pure_pursuit'")
 
         self._car_position = np.array([48.0, 64.0])
         self.mode = mode
@@ -57,16 +57,16 @@ class LateralControl:
 
     # ------------------------------------------------------------------ API
     def control(self, trajectory, speed):
-        # Startphase: Die Kamera zoomt in den ersten ~50 Schritten noch hinein, die Pixel-
-        # abstände stimmen nicht und die Spurerkennung liefert Unsinn. Das Auto steht am
-        # Start gerade auf der Strecke -> einfach geradeaus fahren, sonst schaukelt es sich auf.
+        # Start phase: the camera is still zooming in during the first ~50 steps, pixel
+        # distances are wrong and the lane detection returns garbage. The car starts straight
+        # on the track -> just drive straight ahead, otherwise it starts to oscillate.
         self._step += 1
         if self._step <= self.warmup_steps:
             return 0.0
 
         path = self._prepare_path(trajectory)
         if path is None:
-            # kein brauchbarer Pfad -> letzten Lenkwert langsam abbauen
+            # no usable path -> slowly decay the last steering value
             self._prev_steer *= 0.9
             return float(self._prev_steer)
 
@@ -77,7 +77,7 @@ class LateralControl:
 
         delta = float(np.clip(delta, -self.max_steer, self.max_steer))
 
-        # Tiefpass gegen Zappeln
+        # low-pass filter against jitter
         delta = self.smoothing * self._prev_steer + (1.0 - self.smoothing) * delta
         self._prev_steer = delta
         return delta
@@ -90,7 +90,7 @@ class LateralControl:
     def _stanley(self, path, speed):
         s, i = self._nearest_on_path(path)
 
-        # Tangente über ein kurzes Stück ab dem nächsten Punkt mitteln
+        # average the tangent over a short distance starting at the nearest point
         p0 = self._point_at(path, s)
         p1 = self._point_at(path, s + self.heading_window)
         tangent = p1 - p0
@@ -100,12 +100,12 @@ class LateralControl:
             norm = np.linalg.norm(tangent) + 1e-6
         t = tangent / norm
 
-        # Heading-Fehler: Winkel zwischen Fahrtrichtung (0,-1) und Tangente, >0 = rechts
+        # heading error: angle between driving direction (0,-1) and tangent, >0 = right
         heading_error = np.arctan2(t[0], -t[1])
 
-        # vorzeichenbehaftete senkrechte Querabweichung, >0 = Pfad rechts vom Auto
+        # signed perpendicular cross-track error, >0 = path is right of the car
         r = self._car_position - p0
-        # (r x t: Pfad nach oben, Auto links davon -> e > 0 -> nach rechts lenken)
+        # (r x t: path pointing up, car left of it -> e > 0 -> steer right)
         e = r[0] * t[1] - r[1] * t[0]
 
         return heading_error + np.arctan2(self.k * e, self.k_soft + speed)
@@ -114,7 +114,7 @@ class LateralControl:
     def _pure_pursuit(self, path, speed):
         ld = np.clip(self.ld_min + self.ld_gain * speed, self.ld_min, self.ld_max)
 
-        # erster Pfadpunkt vor dem Auto mit Abstand >= ld
+        # first path point ahead of the car with distance >= ld
         s_near, _ = self._nearest_on_path(path)
         dist = np.linalg.norm(path - self._car_position, axis=1)
         arc = self._arc_length(path)
@@ -123,14 +123,14 @@ class LateralControl:
 
         d = target - self._car_position
         ld_actual = max(np.linalg.norm(d), 1e-6)
-        alpha = np.arctan2(d[0], -d[1])      # >0 = Ziel rechts
+        alpha = np.arctan2(d[0], -d[1])      # >0 = target is to the right
 
         return np.arctan2(2.0 * self.wheelbase * np.sin(alpha), ld_actual)
 
-    # ------------------------------------------------------------ Helfer
+    # ------------------------------------------------------------ Helpers
     def _prepare_path(self, trajectory):
-        """Bringt die Trajektorie in Fahrtrichtung geordnete Form und tastet sie
-        mit 1 px Abstand neu ab. Schneidet andere sichtbare Streckenteile ab."""
+        """Order the trajectory along the driving direction and resample it with
+        1 px spacing. Cuts off other visible parts of the track."""
         if trajectory is None:
             return None
         pts = np.asarray(trajectory, dtype=float)
@@ -139,7 +139,7 @@ class LateralControl:
 
         i = int(np.argmin(np.linalg.norm(pts - self._car_position, axis=1)))
 
-        # Fahrtrichtung bestimmen: in welche Index-Richtung geht es im Bild nach oben?
+        # determine driving direction: which index direction goes up in the image?
         n = 5
         fwd_y = pts[min(i + n, len(pts) - 1)][1] - pts[i][1]
         bwd_y = pts[max(i - n, 0)][1] - pts[i][1]
@@ -147,7 +147,7 @@ class LateralControl:
             pts = pts[::-1]
             i = len(pts) - 1 - i
 
-        # zusammenhängendes Stück um i herum (Sprünge = anderer Streckenteil)
+        # contiguous piece around i (jumps = different part of the track)
         gaps = np.linalg.norm(np.diff(pts, axis=0), axis=1) > self.max_gap
         start = i
         while start > 0 and not gaps[start - 1]:
@@ -159,7 +159,7 @@ class LateralControl:
         if len(pts) < 2:
             return None
 
-        # gleichmäßig neu abtasten (1 px)
+        # resample uniformly (1 px)
         arc = self._arc_length(pts)
         if arc[-1] < 1e-6:
             return None
