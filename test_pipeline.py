@@ -15,7 +15,7 @@ from path_planning import PathPlanning
 def run(env, input_controller: InputController):
     lane_detection = LaneDetection()
     path_planning = PathPlanning()
-    lateral_control = LateralControl()
+    lateral_control = LateralControl(mode="pure_pursuit")
     longitudinal_control = LongitudinalControl()
 
     seed = int(np.random.randint(0, int(1e6)))

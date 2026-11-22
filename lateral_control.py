@@ -19,14 +19,16 @@ class LateralControl:
         # --- Stanley ---
         k=3.0,                 # gain for the cross-track error
         k_soft=5.0,            # prevents overreaction at low speed
-        heading_window=6.0,    # [px] distance over which the path tangent is averaged
+        heading_window=24.0,   # [px] distance over which the path tangent is averaged
+                               #      (short windows amplify pixel noise -> oscillation on straights)
         # --- Pure Pursuit ---
         wheelbase=5.0,         # [px] wheelbase (~3.2 world units * ~1.55 px)
-        ld_min=8.0,            # [px] minimum lookahead distance
-        ld_gain=0.15,          # [px per speed unit]
-        ld_max=30.0,           # [px] maximum lookahead distance
+        ld_min=12.0,           # [px] minimum lookahead distance
+        ld_gain=0.45,          # [px per speed unit] (longer lookahead = calmer on straights)
+        ld_max=40.0,           # [px] maximum lookahead distance
         # --- general ---
         smoothing=0.3,         # low-pass on steering: 0 = off, ->1 = very sluggish
+                               # (>0.5 adds so much lag that it causes oscillation itself)
         max_steer=1.0,
         max_gap=15.0,          # [px] larger point spacing = different part of the track
         warmup_steps=50,       # steps at the start without steering (camera still zooming, image unusable)
