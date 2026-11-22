@@ -5,7 +5,8 @@ from scipy import ndimage
 class LaneDetection:
 
     def __init__(self):
-        pass
+        # Debug image of the last detection (other edges gray, left red, right blue), used by the test scripts
+        self.debug_image = np.zeros((77, 96, 3), dtype=np.uint8)
 
     def detect(self,image):
         image = np.copy(image)[:77,:].astype(np.float32)
@@ -33,7 +34,7 @@ class LaneDetection:
         outer = ndimage.binary_dilation(road_with_car, structure=np.ones((3, 3)))
         edges = outer & ~inner
         edges[ndimage.binary_dilation(car_mask, iterations=2)] = False   # ignore edges of the car mask
-        labels, n = ndimage.label(edges, structure=np.ones((3, 3)))
+        labels, _ = ndimage.label(edges, structure=np.ones((3, 3)))
 
         # Search bottom-up for the first row containing road and take the road segment
         # closest to the car. Its ends are the left and right boundary –

@@ -1,7 +1,7 @@
 [project]
-name = "project"
+name = "autonomous-driving"
 version = "0.1.0"
-description = "Add your description here"
+description = "Modulare Pipeline (Spurerkennung, Pfadplanung, Quer- und Laengsregelung) fuer Gymnasium CarRacing-v3"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
