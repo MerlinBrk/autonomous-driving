@@ -58,7 +58,17 @@ class LateralControl:
         self._step = 0
 
     # ------------------------------------------------------------------ API
-    def control(self, trajectory, speed):
+    def control(self, trajectory: np.ndarray, speed: float) -> float:
+        """Compute the steering value for the current frame.
+
+        Args:
+            trajectory: (N, 2) array of path points [x, y] in image coordinates
+                (from the path planning or the ground truth of the simulation).
+            speed: current speed of the car (info["speed"]).
+
+        Returns:
+            Steering value in [-max_steer, max_steer], + = right.
+        """
         # Start phase: the camera is still zooming in during the first ~50 steps, pixel
         # distances are wrong and the lane detection returns garbage. The car starts straight
         # on the track -> just drive straight ahead, otherwise it starts to oscillate.
@@ -84,12 +94,14 @@ class LateralControl:
         self._prev_steer = delta
         return delta
 
-    def reset(self):
+    def reset(self) -> None:
+        """Reset the internal state (for a new episode)."""
         self._prev_steer = 0.0
         self._step = 0
 
     # ------------------------------------------------------------ Stanley
-    def _stanley(self, path, speed):
+    def _stanley(self, path: np.ndarray, speed: float) -> float:
+        """Stanley: delta = heading error + arctan(k * e / (k_soft + v))."""
         s, i = self._nearest_on_path(path)
 
         # average the tangent over a short distance starting at the nearest point
@@ -113,7 +125,8 @@ class LateralControl:
         return heading_error + np.arctan2(self.k * e, self.k_soft + speed)
 
     # ------------------------------------------------------- Pure Pursuit
-    def _pure_pursuit(self, path, speed):
+    def _pure_pursuit(self, path: np.ndarray, speed: float) -> float:
+        """Pure Pursuit: delta = arctan(2 * L * sin(alpha) / l_d) with speed dependent lookahead l_d."""
         ld = np.clip(self.ld_min + self.ld_gain * speed, self.ld_min, self.ld_max)
 
         # first path point ahead of the car with distance >= ld
@@ -130,7 +143,7 @@ class LateralControl:
         return np.arctan2(2.0 * self.wheelbase * np.sin(alpha), ld_actual)
 
     # ------------------------------------------------------------ Helpers
-    def _prepare_path(self, trajectory):
+    def _prepare_path(self, trajectory: np.ndarray) -> np.ndarray | None:
         """Order the trajectory along the driving direction and resample it with
         1 px spacing. Cuts off other visible parts of the track."""
         if trajectory is None:
@@ -171,15 +184,18 @@ class LateralControl:
         return np.stack([x, y], axis=1)
 
     @staticmethod
-    def _arc_length(path):
+    def _arc_length(path: np.ndarray) -> np.ndarray:
+        """Cumulative arc length along the path, starting at 0."""
         seg = np.linalg.norm(np.diff(path, axis=0), axis=1)
         return np.concatenate([[0.0], np.cumsum(seg)])
 
-    def _nearest_on_path(self, path):
+    def _nearest_on_path(self, path: np.ndarray) -> tuple[float, int]:
+        """Arc length position and index of the path point closest to the car."""
         i = int(np.argmin(np.linalg.norm(path - self._car_position, axis=1)))
         return self._arc_length(path)[i], i
 
-    def _point_at(self, path, s):
+    def _point_at(self, path: np.ndarray, s: float) -> np.ndarray:
+        """Interpolated path point at arc length s (clipped to the path)."""
         arc = self._arc_length(path)
         s = np.clip(s, 0.0, arc[-1])
         return np.array([np.interp(s, arc, path[:, 0]), np.interp(s, arc, path[:, 1])])

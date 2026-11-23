@@ -58,7 +58,7 @@ def run(env, input_controller: InputController):
         plt.plot(target_speed_history)
         try:
             fig.canvas.flush_events()
-        except:
+        except Exception:  # the plot window may already be closed
             pass
 
         # Step the environment

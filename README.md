@@ -84,7 +84,7 @@ working-dir/
 
 ### 4.1 Spurerkennung ([lane_detection.py](lane_detection.py))
 
-**Schnittstelle:** `detect(image) -> (left_boundary, right_boundary)`, jeweils ein `(N, 2)`-Array mit Pixelkoordinaten `[x, y]`, geordnet vom Auto weg entlang der Linie. Zusätzlich wird `self.debug_image` für die Visualisierung gesetzt (rot = links, blau = rechts, grau = andere Kanten).
+**Schnittstelle:** `detect(image) -> (left_boundary, right_boundary)`, jeweils ein `(N, 2)`-Array mit den Pixelkoordinaten `[x, y]` der Randpixel, **ungeordnet** (geordnet wird erst in der Pfadplanung, siehe 4.2). Ein leeres `(0, 2)`-Array bedeutet: Rand nicht sichtbar. Zusätzlich wird `self.debug_image` für die Visualisierung gesetzt (rot = links, blau = rechts, grau = andere Kanten).
 
 **Vorgehen:**
 
@@ -97,7 +97,9 @@ working-dir/
 3. **Aufräumen:** Kleine Löcher (Kantenglättung an Kachelgrenzen) werden gefüllt, kleine Fehl-Blobs entfernt (`scipy.ndimage.label`).
 4. **Kantenerkennung:** Kante = Dilatation minus Erosion der Straßenmaske, also ein 2 px breites Band genau am Übergang Straße/Gras. Der Bildrand zählt dabei nicht als Kante, sonst wären linker und rechter Rand über den oberen Bildrand verbunden. Die Kanten werden in zusammenhängende Komponenten zerlegt.
 5. **Zuordnung links/rechts:** Von unten nach oben wird die erste Bildzeile mit Straße gesucht und darin das Straßensegment, das dem Auto am nächsten liegt. Dessen linkes und rechtes Ende bestimmen, welche Kantenkomponente der linke bzw. rechte Rand ist. Das funktioniert auch, wenn das Auto neben der Straße steht oder mehrere Streckenteile sichtbar sind.
-6. **Ordnen:** Die Pixel jeder Komponente werden per Nächster-Nachbar-Suche vom Auto weg geordnet. Sprünge > 3 px beenden die Linie (Ausreißer werden verworfen).
+6. **Ausgabe:** Die Pixel der beiden gewählten Komponenten werden als Koordinatenliste zurückgegeben.
+
+Alle festen Werte (Bildzuschnitt, Fahrzeugmaske, Farbtoleranzen, Mindestgrößen) sind als benannte Klassenkonstanten mit Kommentar oben in `LaneDetection` definiert, z. B. `CROP_HEIGHT`, `CAR_ROWS`/`CAR_COLS`, `ROAD_COLOR_TOL`, `MIN_SEGMENT_WIDTH`.
 
 **Warum dieser Ansatz:** Ein einfacher Gradient auf dem Graukanal (Ansatz aus der Vorlesung) erkennt auch die Gras-Schachbrettkanten und die Randsteine, und er versagt bei zufälligen Farben. Über die Segmentierung der Straßenfläche entstehen Kanten nur dort, wo wirklich Straße auf Nicht-Straße trifft. Die Zuordnung über das Straßensegment vor dem Auto ist robuster als eine reine Links/Rechts-Aufteilung an der Bildmitte, die in engen Kurven falsch zuordnet.
 
@@ -107,7 +109,9 @@ working-dir/
 
 **Vorgehen:**
 
-1. **Ordnen und Neuabtasten:** Die Randpunkte werden zu einer Polylinie geordnet (nahe Punkte werden gemittelt, Abbruch bei Richtungsumkehr oder Lücke > 6 px) und mit konstantem Abstand von 2 px neu abgetastet. Damit sind beide Ränder direkt vergleichbar.
+1. **Ordnen und Neuabtasten:** Die Randpunkte werden zu einer Polylinie geordnet und mit konstantem Abstand von 2 px neu abgetastet. Damit sind beide Ränder direkt vergleichbar. Das Ordnen beginnt am Punkt nächst dem Auto und springt immer zum nächsten Nachbarn. Dabei werden alle Punkte im Umkreis von 2,5 px zu einem gemittelt; so wird aus dem 2 px breiten Kantenband eine dünne Linie. Bei einer Lücke > 6 px oder einer Richtungsumkehr endet die Linie, so werden andere sichtbare Streckenteile abgeschnitten.
+
+   Das ist die **einzige Stelle, an der Randpunkte geordnet werden**. Früher hat auch die Spurerkennung die Pixel schon geordnet (einfache Nächster-Nachbar-Suche ohne Mitteln und ohne Umkehr-Erkennung). Das war doppelt: Die Pfadplanung muss ohnehin selbst ordnen, weil sie in `test_path_planning.py` direkt die Ground-Truth-Ränder der Simulation bekommt. Deshalb wurde das Ordnen aus der Spurerkennung entfernt.
 2. **Mittellinie:**
    - Der Rand mit mehr Punkten ist die Referenz. Für jeden Referenzpunkt wird der nächste Punkt auf dem anderen Rand gesucht.
    - Ist der Abstand plausibel (±50 % der geschätzten Spurbreite), ist der Mittelpunkt des Paares ein Pfadpunkt.
@@ -169,6 +173,14 @@ Alle Parameter lassen sich im Konstruktor von `LateralControl` übergeben.
 - **Anti-Windup:** Integriert wird nur, solange die Stellgröße nicht gesättigt ist; das Integral ist auf ±100 begrenzt.
 - **Aufteilung:** Stellgröße > 0 → Gas, < 0 → Bremse. Beides wird getrennt an die Simulation übergeben. Die Bremse ist auf 0,8 begrenzt (darüber blockieren die Räder), Bremswerte < 0,05 werden ignoriert (rollen lassen statt bremsen).
 - **Kopplung mit der Lenkung:** Gas und Bremse werden bei starkem Lenkeinschlag reduziert (Gas bis auf 30 %, Bremse bis auf 50 %). Gleichzeitig stark lenken und beschleunigen oder bremsen lässt die Hinterräder ausbrechen.
+
+### 4.5 Codequalität
+
+- **Einheitliche Schnittstellen:** Alle öffentlichen Methoden (`detect`, `plan`, `control`, `predict_target_speed`) haben Docstrings mit Eingabe, Ausgabe, Form der Arrays und Einheit sowie Typangaben.
+- **Keine unbenannten Zahlen:** Feste Werte der Spurerkennung sind Klassenkonstanten, die Parameter der Regler sind Konstruktor-Argumente mit Kommentar.
+- **Keine doppelte Logik:** Randpunkte werden nur einmal geordnet (in der Pfadplanung, siehe 4.2).
+- **Linter:** Die Pipeline-Module sind mit `ruff` (Regeln E, F, W, B, N, UP) ohne Befund. Ausgenommen sind Zeilenlänge (E501) und Leerzeichen zum Ausrichten von Zuweisungen (E221, E272), die bewusst für die Lesbarkeit genutzt werden. Prüfen mit:
+  `uvx ruff check --select E,F,W,B,N,UP --ignore E501,E221,E272 car.py lane_detection.py path_planning.py lateral_control.py longitudinal_control.py`
 
 ---
 

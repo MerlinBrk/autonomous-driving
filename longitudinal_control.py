@@ -2,8 +2,10 @@ import numpy as np
 
 
 class LongitudinalControl:
-    # Constructor
-    def __init__(self, kp=0.1, ki=0.002, kd=0.02, v_min=25.0, v_max=90.0, a_lat=110.0):
+    """Speed control: target speed from the path curvature + PID controller for gas/brake."""
+
+    def __init__(self, kp: float = 0.1, ki: float = 0.002, kd: float = 0.02,
+                 v_min: float = 25.0, v_max: float = 90.0, a_lat: float = 110.0):
         # PID gains (error = target speed - current speed)
         self._kp = kp
         self._ki = ki
@@ -20,8 +22,18 @@ class LongitudinalControl:
         self._d_filtered = 0.0        # low-pass filtered derivative
         self._target_speed = v_min    # smoothed target speed (start slow, it is a race car)
 
-    def control(self, speed, target_speed, steering_angle):
-        """PID speed controller -> returns (acceleration, braking), both in [0, 1]."""
+    def control(self, speed: float, target_speed: float, steering_angle: float) -> tuple[float, float]:
+        """PID speed controller.
+
+        Args:
+            speed: current speed of the car (info["speed"]).
+            target_speed: desired speed (from predict_target_speed).
+            steering_angle: current steering value; gas/brake are reduced when steering hard.
+
+        Returns:
+            (acceleration, braking): gas in [0, 1] and brake in [0, 0.8], sent separately
+            to the simulation.
+        """
         error = target_speed - speed
 
         # D-term on the measured speed instead of the error -> no derivative kick when the target jumps
@@ -54,8 +66,15 @@ class LongitudinalControl:
 
         return acceleration, braking
 
-    def predict_target_speed(self, curvature):
-        """Target speed from path curvature: v = sqrt(a_lat / κ), limited to [v_min, v_max]."""
+    def predict_target_speed(self, curvature: float) -> float:
+        """Target speed from path curvature: v = sqrt(a_lat / κ), limited to [v_min, v_max].
+
+        Args:
+            curvature: max. curvature κ of the planned path in 1/px (from the path planning).
+
+        Returns:
+            Smoothed target speed (decreases immediately, increases gradually).
+        """
         # Curvature of the planned path in 1/px (max over the look-ahead, so curves are anticipated)
         kappa = max(float(curvature), 1e-6)
         v = np.sqrt(self._a_lat / kappa)

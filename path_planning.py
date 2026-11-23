@@ -3,14 +3,30 @@ from scipy.interpolate import splev, splprep
 
 
 class PathPlanning:
-    # Constructor
-    def __init__(self, num_waypoints=30, lane_width=20.0):
+    """Plans the path (center line of the lane) from the two lane boundaries.
+
+    Coordinates: image coordinates (x to the right, y down), unit pixels.
+    """
+
+    def __init__(self, num_waypoints: int = 30, lane_width: float = 20.0):
         self._car_position = np.array([48, 64])  # car position in image coordinates (x, y)
         self._num_waypoints = num_waypoints      # number of waypoints in the planned path
         self._lane_width = lane_width            # initial value in pixels, continuously estimated from the boundaries
         self._last_plan = None                   # fallback if no usable boundaries are found
 
-    def plan(self, left_boundary, right_boundary):
+    def plan(self, left_boundary: np.ndarray, right_boundary: np.ndarray) -> tuple[np.ndarray, float]:
+        """Plan the path for the current frame.
+
+        Args:
+            left_boundary, right_boundary: (N, 2) arrays with pixel coordinates [x, y]
+                of the lane boundaries, in any order (from the lane detection or the
+                ground truth of the simulation). May be empty.
+
+        Returns:
+            (way_points, curvature): way_points is a (num_waypoints, 2) array [x, y],
+            ordered from the car forward. curvature is the max. curvature κ of the
+            path in 1/px (used by the longitudinal control for the target speed).
+        """
         # Order boundary points along the road and resample them at equal spacing
         left  = self._resample(self._order_points(np.asarray(left_boundary, dtype=float), self._car_position[0]))
         right = self._resample(self._order_points(np.asarray(right_boundary, dtype=float), self._car_position[0]))
@@ -25,7 +41,9 @@ class PathPlanning:
         self._last_plan = (way_points, curvature)
         return way_points, curvature
 
-    def _center_line(self, left, right):
+    def _center_line(self, left: np.ndarray, right: np.ndarray) -> np.ndarray:
+        """Center points of the lane: midpoints of matching boundary points, or the
+        reference boundary shifted by half a lane width if there is no valid partner."""
         if len(left) < 2 and len(right) < 2:
             return np.empty((0, 2))
 
@@ -59,8 +77,9 @@ class PathPlanning:
         # Use the midpoint of valid pairs, otherwise the offset fallback
         return np.where(valid[:, None], (ref + other[nearest]) / 2, offset_center)
 
-    def _smooth(self, points):
-        # Fit a smoothing cubic spline through the center points
+    def _smooth(self, points: np.ndarray) -> tuple[np.ndarray, float]:
+        """Fit a smoothing cubic spline through the center points, sample num_waypoints
+        points and compute the max. curvature from the spline derivatives."""
         # noinspection PyTupleAssignmentBalance
         tck, _ = splprep([points[:, 0], points[:, 1]], s=4 * len(points), k=3)
         t = np.linspace(0, 1, self._num_waypoints)
@@ -75,14 +94,22 @@ class PathPlanning:
 
         return np.column_stack([x, y]), curvature
 
-    def _straight_ahead(self):
-        # Straight path from the car position up to the top of the image
+    def _straight_ahead(self) -> tuple[np.ndarray, float]:
+        """Straight path from the car position up to the top of the image (curvature 0)."""
         y = np.linspace(self._car_position[1], 0, self._num_waypoints)
         return np.column_stack([np.full_like(y, self._car_position[0]), y]), 0.0
 
     @staticmethod
-    def _order_points(points, car_x, radius=2.5, max_gap=6.0):
-        """Order unsorted boundary pixels into a polyline, starting near the car."""
+    def _order_points(points: np.ndarray, car_x: float, radius: float = 2.5, max_gap: float = 6.0) -> np.ndarray:
+        """Order unsorted boundary pixels into a polyline, starting near the car.
+
+        This is the only place where boundary points are ordered (the lane detection
+        returns them unordered). Besides ordering it also
+          - averages all points within `radius` into one point -> the 2 px wide edge band
+            becomes a thin line,
+          - stops at a gap > max_gap or if the line turns back on itself -> other visible
+            parts of the track are cut off.
+        """
         if len(points) == 0:
             return np.empty((0, 2))
 
@@ -111,7 +138,7 @@ class PathPlanning:
         return np.asarray(ordered)
 
     @staticmethod
-    def _resample(polyline, spacing=2.0):
+    def _resample(polyline: np.ndarray, spacing: float = 2.0) -> np.ndarray:
         """Resample the polyline at equal arc-length spacing -> boundaries become comparable."""
         if len(polyline) < 2:
             return polyline
