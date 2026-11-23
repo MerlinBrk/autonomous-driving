@@ -111,13 +111,6 @@ Alle Parameter lassen sich im Konstruktor von `LateralControl` übergeben.
 - **Aufteilung:** Stellgröße > 0 → Gas, < 0 → Bremse. Beides wird getrennt an die Simulation übergeben. Die Bremse ist auf 0,8 begrenzt (darüber blockieren die Räder), Bremswerte < 0,05 werden ignoriert (rollen lassen statt bremsen).
 - **Kopplung mit der Lenkung:** Gas und Bremse werden bei starkem Lenkeinschlag reduziert (Gas bis auf 30 %, Bremse bis auf 50 %). Gleichzeitig stark lenken und beschleunigen oder bremsen lässt die Hinterräder ausbrechen.
 
-### 2.5 Codequalität
-
-- **Einheitliche Schnittstellen:** Alle öffentlichen Methoden (`detect`, `plan`, `control`, `predict_target_speed`) haben Docstrings mit Eingabe, Ausgabe, Form der Arrays und Einheit sowie Typangaben.
-- **Keine unbenannten Zahlen:** Feste Werte der Spurerkennung sind Klassenkonstanten, die Parameter der Regler sind Konstruktor-Argumente mit Kommentar.
-- **Keine doppelte Logik:** Randpunkte werden nur einmal geordnet (in der Pfadplanung, siehe 2.2).
-- **Linter:** Die Pipeline-Module sind mit `ruff` (Regeln E, F, W, B, N, UP) ohne Befund. Ausgenommen sind Zeilenlänge (E501) und Leerzeichen zum Ausrichten von Zuweisungen (E221, E272), die bewusst für die Lesbarkeit genutzt werden. Prüfen mit:
-  `uvx ruff check --select E,F,W,B,N,UP --ignore E501,E221,E272 car.py lane_detection.py path_planning.py lateral_control.py longitudinal_control.py`
 
 ---
 
