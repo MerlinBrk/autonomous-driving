@@ -44,6 +44,20 @@ Der Querregler wird in [car.py](car.py) gewählt; Standard ist Pure Pursuit:
 self._lateral_control = LateralControl(mode="pure_pursuit")   # oder mode="stanley"
 ```
 
+## Erweiterungen und Parameter
+
+Über die Mindestanforderung hinaus sind die folgenden Erweiterungen umgesetzt. Alle Parameter sind Konstruktor-Argumente der jeweiligen Klasse (die Standardwerte stehen in der Signatur). Begründungen und Ergebnisse stehen in der [Projektdokumentation](Projektdokumentation.md).
+
+| Erweiterung | Aufruf / Parameter | Doku |
+|---|---|---|
+| **Domain Randomization:** Spurerkennung ohne feste Farbschwellen, die Straßenfarbe wird in jedem Bild geschätzt | `uv run python main.py --domain_randomize`, `uv run python test_lane_detection.py --domain_randomize` | 2.1, 3.1 |
+| **Zwei Querregler** (Stanley und Pure Pursuit), per Parameter umschaltbar | `LateralControl(mode="stanley")` oder `LateralControl(mode="pure_pursuit")` in `car.py`; interaktiv `uv run python test_lateral_control.py --mode stanley` bzw. `--mode pure_pursuit` | 2.3 |
+| **Reglervergleich** ohne Fenster (Ground-Truth-Pfad, feste Zielgeschwindigkeit, gleiche Strecken für beide Regler) | `uv run python compare_lateral_control.py --speeds 40 60 80 --seeds 10` | 3.2, 3.3 |
+| **Tiefpass auf den Lenkwert** gegen Zittern, Startphase ohne Lenkung (die Kamera zoomt anfangs noch heran) | `LateralControl(smoothing=0.3, warmup_steps=50)` | 2.3 |
+| **Pfad auch mit nur einem sichtbaren Rand**, Spline-Glättung, Krümmung als Maximum über den sichtbaren Pfad | `PathPlanning(num_waypoints=30, lane_width=20.0)` | 2.2 |
+| **Zielgeschwindigkeit aus der Krümmung** (v = √(a_lat / κ)), sofort langsamer, nur allmählich schneller | `LongitudinalControl(v_min=25, v_max=90, a_lat=110)` | 2.4 |
+| **PID-Regler** mit D-Anteil auf der Messgröße, Anti-Windup, getrennten Gas- und Bremswerten und Kopplung an die Lenkung | `LongitudinalControl(kp=0.1, ki=0.002, kd=0.02)` | 2.4 |
+
 ## Struktur
 
 | Datei | Inhalt |
